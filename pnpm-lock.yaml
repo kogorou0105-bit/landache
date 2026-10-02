@@ -14,15 +14,25 @@ importers:
       '@commitlint/config-conventional':
         specifier: ^21.2.3
         version: 21.2.3
+      '@types/node':
+        specifier: ^26.6.4
+        version: 26.6.4
       lefthook:
         specifier: ^2.1.16
         version: 2.1.16
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
 
   apps/cli: {}
 
   apps/web: {}
 
-  packages/agent: {}
+  packages/agent:
+    dependencies:
+      '@landache/protocol':
+        specifier: workspace:*
+        version: link:../protocol
 
   packages/config: {}
 

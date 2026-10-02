@@ -5,6 +5,7 @@
 ## 架构
 
 - [技术架构](architecture/overview.md)
+- [最小模型回合设计](architecture/model-turn.md)
 
 ## 开发
 

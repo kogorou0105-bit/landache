@@ -1,8 +1,6 @@
-<p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="assets/brand/symbol-on-dark.svg" />
-    <img src="assets/brand/symbol-on-light.svg" alt="Landache" width="220" />
-  </picture>
-</p>
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/brand/readme-banner-on-dark.svg" />
+  <img src="assets/brand/readme-banner-on-light.svg" alt="Landache" width="100%" />
+</picture>
 
-<h1 align="center">Landache</h1>
+# Landache
