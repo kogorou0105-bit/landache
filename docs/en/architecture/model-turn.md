@@ -268,12 +268,12 @@ demonstrated requirements. Copying them early would hide architectural decisions
 
 The stable seams established by this change support:
 
-1. defining a tool registry, argument schemas, and normalized tool results;
-2. implementing an outer `runAgentLoop` that alternates model turns and tool execution;
-3. connecting events to persistence and CLI/Web projections;
-4. mapping different model SDKs into `ModelStreamEvent` in provider adapters;
-5. adding sequence, run ID, timestamps, and schema versions after the event schema stabilizes.
+1. implementing an outer `runAgentLoop` that alternates model turns and tool execution;
+2. connecting events to persistence and CLI/Web projections;
+3. mapping different model SDKs into `ModelStreamEvent` in provider adapters;
+4. adding sequence, run ID, timestamps, and schema versions after the event schema stabilizes.
 
-The most useful next increment is **a minimal tool registry and tool result**, not UI, database integration, or a
+The tool registry and tool result are now implemented. The most useful next increment is **a minimal
+`runAgentLoop`**, not UI, database integration, or a
 complex provider. It will validate the real closed loop: model proposal → validation and execution →
 recorded result → another model turn → explicit completion.

@@ -7,6 +7,7 @@
 - [技术架构](architecture/overview.md)
 - [最小模型回合设计](architecture/model-turn.md)
 - [Tool Call 数据契约](architecture/tool-call-contract.md)
+- [Tool Registry 与执行边界](architecture/tool-execution.md)
 
 ## 开发
 
