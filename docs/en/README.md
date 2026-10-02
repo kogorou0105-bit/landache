@@ -6,6 +6,7 @@
 
 - [Technical architecture](architecture/overview.md)
 - [Minimal model turn design](architecture/model-turn.md)
+- [Tool call data contract](architecture/tool-call-contract.md)
 
 ## Development
 
