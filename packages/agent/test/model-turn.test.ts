@@ -3,7 +3,7 @@ import test from "node:test"
 
 import type { AgentEvent } from "@landache/protocol"
 
-import { runModelTurn, type ModelStream } from "../src/model-turn.ts"
+import { runModelTurn, type ModelStream } from "@landache/agent"
 
 const userMessage = { id: "user-1", role: "user", content: "Say hello" } as const
 

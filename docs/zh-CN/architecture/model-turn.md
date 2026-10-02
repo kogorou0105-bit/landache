@@ -257,11 +257,10 @@ follow-up queue、并行或顺序工具执行、动态工具集、上下文转�
 
 这次提交建立的稳定接缝将支持：
 
-1. 定义 Tool Registry、参数 Schema 和标准化 Tool Result；
-2. 实现外层 `runAgentLoop`，在模型回合与工具执行之间循环；
-3. 将事件接入持久化存储和 CLI/Web Projection；
-4. 在 Provider Adapter 中把不同模型 SDK 映射为统一的 `ModelStreamEvent`；
-5. 在 Event Schema 稳定后加入 sequence、run ID、时间戳和版本信息。
+1. 实现外层 `runAgentLoop`，在模型回合与工具执行之间循环；
+2. 将事件接入持久化存储和 CLI/Web Projection；
+3. 在 Provider Adapter 中把不同模型 SDK 映射为统一的 `ModelStreamEvent`；
+4. 在 Event Schema 稳定后加入 sequence、run ID、时间戳和版本信息。
 
-下一步最适合增加的是**一个最小 Tool Registry 与 Tool Result**，而不是立即加入 UI、数据库或复杂 Provider。
+Tool Registry 与 Tool Result 已经实现。下一步最适合增加的是**最小 `runAgentLoop`**，而不是立即加入 UI、数据库或复杂 Provider。
 它可以验证真正的闭环：模型提出调用 → 校验并执行工具 → 记录结果 → 再调用模型 → 明确结束。

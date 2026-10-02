@@ -7,6 +7,8 @@ import type {
   ToolCall,
 } from "@landache/protocol"
 
+import { describeError, emitBestEffort } from "./internal/failure.js"
+
 export type ModelStopReason = "end_turn" | "tool_use" | "max_tokens" | "content_filter"
 
 export type ModelStreamEvent =
@@ -166,25 +168,6 @@ function toAssistantStopReason(reason: ModelStopReason): AssistantStopReason {
     default:
       return assertNever(reason)
   }
-}
-
-async function emitBestEffort(
-  emit: (event: AgentEvent) => void | Promise<void>,
-  event: AgentEvent,
-): Promise<void> {
-  try {
-    await emit(event)
-  } catch {
-    // The original failure remains authoritative when the event sink is also unavailable.
-  }
-}
-
-function describeError(error: unknown): string {
-  if (error instanceof Error) {
-    return error.message
-  }
-
-  return String(error ?? "Unknown error")
 }
 
 function assertNever(value: never): never {

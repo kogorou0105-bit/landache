@@ -6,6 +6,17 @@ export type {
   AssistantStopReason,
   TextContent,
   ToolCallContent,
+  ToolResultMessage,
   UserMessage,
 } from "./message.js"
-export type { JsonPrimitive, JsonValue, ToolArguments, ToolCall } from "./tool.js"
+export type {
+  JsonPrimitive,
+  JsonObject,
+  JsonValue,
+  ToolArguments,
+  ToolCall,
+  ToolDescriptor,
+  ToolErrorCode,
+  ToolInputSchema,
+  ToolResultContent,
+} from "./tool.js"

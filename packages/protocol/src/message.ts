@@ -1,4 +1,4 @@
-import type { ToolCall } from "./tool.js"
+import type { ToolCall, ToolResultContent } from "./tool.js"
 
 export type UserMessage = {
   id: string
@@ -27,4 +27,12 @@ export type AssistantMessage = {
   stopReason: AssistantStopReason
 }
 
-export type AgentMessage = UserMessage | AssistantMessage
+export type ToolResultMessage = {
+  id: string
+  role: "tool"
+  toolCallId: string
+  toolName: string
+  content: ToolResultContent
+}
+
+export type AgentMessage = UserMessage | AssistantMessage | ToolResultMessage
