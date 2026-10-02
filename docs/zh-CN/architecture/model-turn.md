@@ -56,8 +56,8 @@ type UserMessage = {
 type AssistantMessage = {
   id: string
   role: "assistant"
-  content: string
-  stopReason: "end_turn"
+  content: AssistantContent[]
+  stopReason: "end_turn" | "tool_use" | "max_tokens" | "content_filter"
 }
 ```
 
@@ -66,17 +66,17 @@ ID 由调用方创建，因为调用方最终会负责 Session、持久化和幂
 
 ### 3.2 输入历史是只读的
 
-`messages` 使用 `readonly AgentMessage[]`。`runModelTurn` 不修改调用方的历史，而是在成功后
-返回一个包含最终 Assistant Message 的新数组。这避免部分失败时悄悄污染 Session 状态，也让
-单元测试和未来的事件持久化更容易推理。
+`messages` 使用 `readonly AgentMessage[]`。`runModelTurn` 不修改调用方的历史，只返回本回合
+生成的 Assistant Message，由外层显式追加。这避免部分失败时悄悄污染 Session 状态，也让
+状态所有权更容易推理。
 
 ### 3.3 只允许完整的 Assistant Message
 
-`AssistantMessage.stopReason` 不包含 `null`。流式期间的草稿由函数内部的 `chunks` 和尚未确定
+`AssistantMessage.stopReason` 不包含 `null`。流式期间的草稿由函数内部的内容构建器和尚未确定
 的 `stopReason` 表示；只有收到 `response.completed` 后才构造 Assistant Message。
 
 `stopReason` 仍属于最终消息，因为它描述模型为什么停止，并将成为外层循环决定“结束、执行工具
-还是继续”的输入。当前只有 `end_turn`，以后可扩展为工具调用、长度限制等明确变体。
+还是继续”的输入。`end_turn` 表示正常结束，`tool_use` 表示外层循环需要处理 Tool Call。
 
 ### 3.4 `runModelTurn` 数据类型关系
 
@@ -112,6 +112,11 @@ classDiagram
         +string delta
     }
 
+    class ToolCallCompleted {
+        +string type
+        +ToolCall toolCall
+    }
+
     class ResponseCompleted {
         +string type
         +string stopReason
@@ -130,12 +135,11 @@ classDiagram
     class AssistantMessage {
         +string id
         +string role
-        +string content
+        +AssistantContent[] content
         +string stopReason
     }
 
     class ModelTurnResult {
-        +AgentMessage[] messages
         +AssistantMessage assistantMessage
     }
 
@@ -145,10 +149,10 @@ classDiagram
     ModelTurnOptions --> ModelStream : 调用
     ModelStream --> ModelStreamEvent : 产生
     ModelStreamEvent --> TextDelta : 变体
+    ModelStreamEvent --> ToolCallCompleted : 变体
     ModelStreamEvent --> ResponseCompleted : 变体
     AgentMessage --> UserMessage : 变体
     AgentMessage --> AssistantMessage : 变体
-    ModelTurnResult o-- AgentMessage : 新历史
     ModelTurnResult *-- AssistantMessage : 最终消息
 ```
 
@@ -166,11 +170,15 @@ classDiagram
 | `turn.started` | `turn` | 标识一次模型回合开始 |
 | `message.started` | `messageId`, `role` | 让消费者建立空的消息 Projection |
 | `message.delta` | `messageId`, `delta` | 只传新增内容，避免重复发送完整消息 |
+| `tool.call.proposed` | `messageId`, `toolCall` | 发布模型提出的完整、尚未执行的调用 |
 | `message.completed` | 最终 `message` | 发布经过验证的完整消息 |
+| `message.failed` / `message.cancelled` | `messageId` 与原因 | 结束未完成的消息生命周期 |
 | `turn.completed` | `turn`, `messageId` | 结束回合并关联最终消息 |
+| `turn.failed` / `turn.cancelled` | `turn` 与原因 | 结束未完成的回合生命周期 |
 
 `message.delta` 不包含不断增长的完整消息。消费者按照 `messageId` 自行累加 delta；服务端内部
-也使用字符串数组，结束时只调用一次 `join("")`。这样传输量不会随文本增长而重复膨胀。
+按连续文本块使用字符串数组，刷新文本块时只调用一次 `join("")`。这样既避免重复膨胀，又能
+保持文本块和 Tool Call 的原始顺序。
 
 本层也不再发出 `agent.started` 和 `agent.completed`。它无法诚实地声明整个 Agent Run 的开始
 或完成，这两个事件应由未来真正的 Agent Loop 发出。
@@ -182,10 +190,15 @@ classDiagram
 ```ts
 type ModelStreamEvent =
   | { type: "text.delta"; delta: string }
-  | { type: "response.completed"; stopReason: "end_turn" }
+  | { type: "tool_call.completed"; toolCall: ToolCall }
+  | { type: "response.completed"; stopReason: ModelStopReason }
 ```
 
-默认分支调用 `assertNever`。当以后加入 Tool Call、Usage 或 Reasoning 事件时，如果没有同步更新
+`ModelStopReason` 是模型流自己的类型，不引用 `AssistantMessage`。`runModelTurn` 通过穷举映射把
+它转换成领域层的 `AssistantStopReason`。当前同时保留 `max_tokens` 和 `content_filter`，不会把
+截断或安全过滤静默伪装为正常的 `end_turn`。
+
+默认分支调用 `assertNever`。当以后加入 Usage 或 Reasoning 事件时，如果没有同步更新
 处理逻辑，TypeScript 会在构建阶段失败，而不是在运行时把新事件误认为完成事件。
 
 如果流在 `response.completed` 之前结束，函数抛出错误，不会生成一个看似完整的 Assistant
@@ -199,9 +212,15 @@ Message。
 - 流式过程中取消时，本回合失败，不发布完成消息；
 - 同一个 Signal 会传给 Provider Adapter，使其未来可以主动终止网络请求。
 
-`emit` 是一个被 `await` 的 fail-fast 边界。如果事件消费者抛错，本回合立即失败。现在不吞掉
-错误，是因为未来持久化层可能就是事件消费者；继续运行会造成“模型已经前进、关键事件却没有
-保存”的不一致。是否区分持久化消费者和纯 UI 订阅者，将由后续 Event Bus 设计决定。
+`emit` 是一个被 `await` 的 fail-fast 边界。如果事件消费者抛错，本回合立即失败。函数记录哪些
+started/terminal 事件已成功发送：普通异常以 `message.failed`、`turn.failed` 收尾，abort 以
+`message.cancelled`、`turn.cancelled` 收尾，且不会为尚未开始或已经完成的实体制造矛盾终态。
+
+如果 `emit` 本身已经不可用，终态只能 best-effort 发送，函数保留并重新抛出原始错误。真正的
+可靠事件闭合需要未来 Event Store 提供事务或原子追加能力，不能由一次普通回调调用保证。
+
+`ModelTurnResult` 只返回新生成的 `assistantMessage`。消息历史归未来外层 Agent Loop 所有，由
+调用方显式追加，避免“返回完整历史”和“返回最后消息”两个事实来源产生分歧。
 
 ## 7. 构建和类型检查为什么属于本次设计
 
@@ -238,13 +257,11 @@ follow-up queue、并行或顺序工具执行、动态工具集、上下文转�
 
 这次提交建立的稳定接缝将支持：
 
-1. 扩展 Assistant Message，使其包含结构化 Tool Call；
-2. 定义 Tool Registry、参数 Schema 和标准化 Tool Result；
-3. 实现外层 `runAgentLoop`，在模型回合与工具执行之间循环；
-4. 根据 `stopReason` 和 Tool Call 明确决定是否继续；
-5. 将事件接入持久化存储和 CLI/Web Projection；
-6. 在 Provider Adapter 中把不同模型 SDK 映射为统一的 `ModelStreamEvent`；
-7. 在 Event Schema 稳定后加入 sequence、run ID、时间戳和版本信息。
+1. 定义 Tool Registry、参数 Schema 和标准化 Tool Result；
+2. 实现外层 `runAgentLoop`，在模型回合与工具执行之间循环；
+3. 将事件接入持久化存储和 CLI/Web Projection；
+4. 在 Provider Adapter 中把不同模型 SDK 映射为统一的 `ModelStreamEvent`；
+5. 在 Event Schema 稳定后加入 sequence、run ID、时间戳和版本信息。
 
-下一步最适合增加的是**一个最小 Tool Call 回合**，而不是立即加入 UI、数据库或复杂 Provider。
+下一步最适合增加的是**一个最小 Tool Registry 与 Tool Result**，而不是立即加入 UI、数据库或复杂 Provider。
 它可以验证真正的闭环：模型提出调用 → 校验并执行工具 → 记录结果 → 再调用模型 → 明确结束。

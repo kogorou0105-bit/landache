@@ -1,8 +1,18 @@
-import type { AgentEvent, AgentMessage, AssistantMessage } from "@landache/protocol"
+import type {
+  AgentEvent,
+  AgentMessage,
+  AssistantContent,
+  AssistantMessage,
+  AssistantStopReason,
+  ToolCall,
+} from "@landache/protocol"
+
+export type ModelStopReason = "end_turn" | "tool_use" | "max_tokens" | "content_filter"
 
 export type ModelStreamEvent =
   | { type: "text.delta"; delta: string }
-  | { type: "response.completed"; stopReason: "end_turn" }
+  | { type: "tool_call.completed"; toolCall: ToolCall }
+  | { type: "response.completed"; stopReason: ModelStopReason }
 
 export type ModelStream = (
   messages: readonly AgentMessage[],
@@ -19,63 +29,162 @@ export type ModelTurnOptions = {
 }
 
 export type ModelTurnResult = {
-  messages: AgentMessage[]
   assistantMessage: AssistantMessage
 }
 
 export async function runModelTurn(options: ModelTurnOptions): Promise<ModelTurnResult> {
   const emit = options.emit ?? (() => undefined)
-  const chunks: string[] = []
-  let stopReason: AssistantMessage["stopReason"] | undefined
+  const content: AssistantContent[] = []
+  const pendingTextChunks: string[] = []
+  const toolCallIds = new Set<string>()
+  let modelStopReason: ModelStopReason | undefined
+  let turnStarted = false
+  let messageStarted = false
+  let messageTerminated = false
+  let turnTerminated = false
+
+  const flushText = () => {
+    if (pendingTextChunks.length === 0) {
+      return
+    }
+
+    content.push({ type: "text", text: pendingTextChunks.join("") })
+    pendingTextChunks.length = 0
+  }
 
   options.signal?.throwIfAborted()
-  await emit({ type: "turn.started", turn: options.turn })
-  await emit({
-    type: "message.started",
-    messageId: options.assistantMessageId,
-    role: "assistant",
-  })
+  try {
+    await emit({ type: "turn.started", turn: options.turn })
+    turnStarted = true
+    await emit({
+      type: "message.started",
+      messageId: options.assistantMessageId,
+      role: "assistant",
+    })
+    messageStarted = true
 
-  for await (const event of options.streamModel(options.messages, options.signal)) {
+    for await (const event of options.streamModel(options.messages, options.signal)) {
+      options.signal?.throwIfAborted()
+
+      switch (event.type) {
+        case "text.delta":
+          pendingTextChunks.push(event.delta)
+          await emit({
+            type: "message.delta",
+            messageId: options.assistantMessageId,
+            delta: event.delta,
+          })
+          break
+        case "tool_call.completed":
+          if (toolCallIds.has(event.toolCall.id)) {
+            throw new Error(`Duplicate tool call id: ${event.toolCall.id}`)
+          }
+
+          flushText()
+          toolCallIds.add(event.toolCall.id)
+          content.push({ type: "tool_call", toolCall: event.toolCall })
+          await emit({
+            type: "tool.call.proposed",
+            messageId: options.assistantMessageId,
+            toolCall: event.toolCall,
+          })
+          break
+        case "response.completed":
+          modelStopReason = event.stopReason
+          break
+        default:
+          assertNever(event)
+      }
+    }
+
     options.signal?.throwIfAborted()
 
-    switch (event.type) {
-      case "text.delta":
-        chunks.push(event.delta)
-        await emit({
-          type: "message.delta",
-          messageId: options.assistantMessageId,
-          delta: event.delta,
-        })
-        break
-      case "response.completed":
-        stopReason = event.stopReason
-        break
-      default:
-        assertNever(event)
+    if (modelStopReason === undefined) {
+      throw new Error("Model stream ended before response.completed")
     }
+
+    flushText()
+
+    if (modelStopReason === "tool_use" && toolCallIds.size === 0) {
+      throw new Error("Model completed with tool_use but proposed no tool calls")
+    }
+
+    if (modelStopReason !== "tool_use" && toolCallIds.size > 0) {
+      throw new Error(`Model proposed tool calls but completed with ${modelStopReason}`)
+    }
+
+    const assistantMessage: AssistantMessage = {
+      id: options.assistantMessageId,
+      role: "assistant",
+      content,
+      stopReason: toAssistantStopReason(modelStopReason),
+    }
+
+    await emit({ type: "message.completed", message: assistantMessage })
+    messageTerminated = true
+    await emit({
+      type: "turn.completed",
+      turn: options.turn,
+      messageId: assistantMessage.id,
+    })
+    turnTerminated = true
+
+    return { assistantMessage }
+  } catch (error) {
+    const cancelled = options.signal?.aborted === true
+    const detail = describeError(cancelled ? options.signal?.reason : error)
+
+    if (messageStarted && !messageTerminated) {
+      await emitBestEffort(
+        emit,
+        cancelled
+          ? { type: "message.cancelled", messageId: options.assistantMessageId, reason: detail }
+          : { type: "message.failed", messageId: options.assistantMessageId, error: detail },
+      )
+    }
+
+    if (turnStarted && !turnTerminated) {
+      await emitBestEffort(
+        emit,
+        cancelled
+          ? { type: "turn.cancelled", turn: options.turn, reason: detail }
+          : { type: "turn.failed", turn: options.turn, error: detail },
+      )
+    }
+
+    throw error
+  }
+}
+
+function toAssistantStopReason(reason: ModelStopReason): AssistantStopReason {
+  switch (reason) {
+    case "end_turn":
+    case "tool_use":
+    case "max_tokens":
+    case "content_filter":
+      return reason
+    default:
+      return assertNever(reason)
+  }
+}
+
+async function emitBestEffort(
+  emit: (event: AgentEvent) => void | Promise<void>,
+  event: AgentEvent,
+): Promise<void> {
+  try {
+    await emit(event)
+  } catch {
+    // The original failure remains authoritative when the event sink is also unavailable.
+  }
+}
+
+function describeError(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message
   }
 
-  if (stopReason === undefined) {
-    throw new Error("Model stream ended before response.completed")
-  }
-
-  const assistantMessage: AssistantMessage = {
-    id: options.assistantMessageId,
-    role: "assistant",
-    content: chunks.join(""),
-    stopReason,
-  }
-  const messages = [...options.messages, assistantMessage]
-
-  await emit({ type: "message.completed", message: assistantMessage })
-  await emit({
-    type: "turn.completed",
-    turn: options.turn,
-    messageId: assistantMessage.id,
-  })
-
-  return { messages, assistantMessage }
+  return String(error ?? "Unknown error")
 }
 
 function assertNever(value: never): never {
