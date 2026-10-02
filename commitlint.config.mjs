@@ -23,6 +23,7 @@ const scopes = [
   "runtime",
   "schemas",
   "evals",
+  "architecture",
   "docs",
   "brand",
   "repo",
@@ -70,4 +71,3 @@ export default {
     "type-enum": [2, "always", Object.keys(emojiByType)],
   },
 }
-
