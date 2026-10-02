@@ -1,14 +1,8 @@
 {
   "$schema": "https://json.schemastore.org/tsconfig",
-  "compilerOptions": {
-    "strict": true,
-    "target": "ES2022",
-    "module": "ESNext",
-    "moduleResolution": "Bundler",
-    "resolveJsonModule": true,
-    "isolatedModules": true,
-    "skipLibCheck": true,
-    "noEmit": true
-  }
+  "files": [],
+  "references": [
+    { "path": "./packages/protocol/tsconfig.build.json" },
+    { "path": "./packages/agent/tsconfig.build.json" }
+  ]
 }
-
