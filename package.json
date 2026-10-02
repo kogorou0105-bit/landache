@@ -1,0 +1,19 @@
+{
+  "name": "landache",
+  "private": true,
+  "version": "0.0.0",
+  "packageManager": "pnpm@10.17.1",
+  "scripts": {
+    "build": "pnpm -r build",
+    "commitlint": "commitlint",
+    "dev": "pnpm --parallel -r dev",
+    "prepare": "lefthook install",
+    "test": "pnpm -r test",
+    "typecheck": "pnpm -r typecheck"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^21.2.3",
+    "@commitlint/config-conventional": "^21.2.3",
+    "lefthook": "^2.1.16"
+  }
+}
