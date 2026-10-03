@@ -10,4 +10,5 @@ evals/reports/*
 !evals/reports/.gitkeep
 .DS_Store
 *.log
-
+.env*
+!.env.example

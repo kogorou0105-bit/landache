@@ -1,7 +1,11 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 
-import { createOpenAIResponsesStream } from "@landache/providers"
+import {
+  createOpenAIResponsesStream,
+  createProviderModelStream,
+  resolveProviderConfig,
+} from "@landache/providers"
 
 test("maps OpenAI text and function-call SSE events", async () => {
   const requestBodies: Record<string, unknown>[] = []
@@ -140,4 +144,62 @@ test("parses SSE split across chunks and serializes assistant text", async () =>
     role: "assistant",
     content: [{ type: "output_text", text: "prior answer" }],
   }])
+})
+
+test("sends complete history for a stateless DeepSeek tool round trip", async () => {
+  const requestBodies: Record<string, unknown>[] = []
+  const fetchMock: typeof fetch = async (_input, init) => {
+    requestBodies.push(JSON.parse(String(init?.body)) as Record<string, unknown>)
+    return new Response('data: {"type":"response.completed","response":{"id":"deepseek-response"}}\n\n')
+  }
+  const stream = createProviderModelStream(resolveProviderConfig({
+    MODEL_PROVIDER: "deepseek",
+    MODEL_NAME: "deepseek-flash",
+    DEEPSEEK_API_KEY: "test-key",
+  }), { fetch: fetchMock })
+
+  for await (const _event of stream({
+    messages: [{ id: "u1", role: "user", content: "Read README" }],
+    tools: [],
+  })) { /* drain */ }
+  for await (const _event of stream({
+    messages: [
+      { id: "u1", role: "user", content: "Read README" },
+      {
+        id: "a1",
+        role: "assistant",
+        content: [{ type: "tool_call", toolCall: {
+          id: "call-1",
+          name: "read_file",
+          arguments: { path: "README.md" },
+        } }],
+        stopReason: "tool_use",
+      },
+      {
+        id: "t1",
+        role: "tool",
+        toolCallId: "call-1",
+        toolName: "read_file",
+        content: { type: "output", value: { content: "Landache" } },
+      },
+    ],
+    tools: [],
+  })) { /* drain */ }
+
+  assert.equal(requestBodies[1]?.store, false)
+  assert.equal("previous_response_id" in (requestBodies[1] ?? {}), false)
+  assert.deepEqual(requestBodies[1]?.input, [
+    { role: "user", content: "Read README" },
+    {
+      type: "function_call",
+      call_id: "call-1",
+      name: "read_file",
+      arguments: '{"path":"README.md"}',
+    },
+    {
+      type: "function_call_output",
+      call_id: "call-1",
+      output: '{"type":"output","value":{"content":"Landache"}}',
+    },
+  ])
 })

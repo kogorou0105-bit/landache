@@ -6,21 +6,41 @@ import type {
   ToolDescriptor,
 } from "@landache/protocol"
 
-export type OpenAIResponsesOptions = {
+export type ResponsesConversationStrategy = "previous_response_id" | "full_history"
+
+export type ResponsesOptions = {
   apiKey: string
   model: string
-  baseUrl?: string
+  baseUrl: string
+  conversation: ResponsesConversationStrategy
+  store: boolean
+  providerName?: string
   fetch?: typeof globalThis.fetch
 }
 
+export type OpenAIResponsesOptions = Pick<ResponsesOptions, "apiKey" | "model" | "fetch"> & {
+  baseUrl?: string
+}
+
 export function createOpenAIResponsesStream(options: OpenAIResponsesOptions): ModelStream {
+  return createResponsesStream({
+    ...options,
+    baseUrl: options.baseUrl ?? "https://api.openai.com/v1",
+    conversation: "previous_response_id",
+    store: true,
+    providerName: "OpenAI",
+  })
+}
+
+export function createResponsesStream(options: ResponsesOptions): ModelStream {
   const fetchImplementation = options.fetch ?? globalThis.fetch
   let previousResponseId: string | undefined
   return async function* ({ messages, tools, signal }) {
-    const inputMessages = previousResponseId === undefined
+    const inputMessages = options.conversation === "full_history" || previousResponseId === undefined
       ? messages
       : messages.slice(findLastAssistantIndex(messages) + 1)
-    const response = await fetchImplementation(`${options.baseUrl ?? "https://api.openai.com/v1"}/responses`, {
+    const baseUrl = options.baseUrl.replace(/\/+$/, "")
+    const response = await fetchImplementation(`${baseUrl}/responses`, {
       method: "POST",
       headers: {
         authorization: `Bearer ${options.apiKey}`,
@@ -31,18 +51,20 @@ export function createOpenAIResponsesStream(options: OpenAIResponsesOptions): Mo
         input: toOpenAIInput(inputMessages),
         tools: tools.map(toOpenAITool),
         stream: true,
-        store: true,
-        ...(previousResponseId === undefined ? {} : { previous_response_id: previousResponseId }),
+        store: options.store,
+        ...(options.conversation === "previous_response_id" && previousResponseId !== undefined
+          ? { previous_response_id: previousResponseId }
+          : {}),
       }),
       signal,
     })
 
     if (!response.ok) {
       const detail = (await response.text()).slice(0, 2_000)
-      throw new Error(`OpenAI Responses API returned ${response.status}: ${detail}`)
+      throw new Error(`${options.providerName ?? "Responses provider"} returned ${response.status}: ${detail}`)
     }
     if (response.body === null) {
-      throw new Error("OpenAI Responses API returned no response body")
+      throw new Error(`${options.providerName ?? "Responses provider"} returned no response body`)
     }
 
     let sawToolCall = false
@@ -55,7 +77,7 @@ export function createOpenAIResponsesStream(options: OpenAIResponsesOptions): Mo
         if (item.type === "function_call") {
           const argumentsValue: unknown = JSON.parse(stringProperty(item, "arguments"))
           if (!isJsonObject(argumentsValue)) {
-            throw new Error("OpenAI function call arguments must be a JSON object")
+            throw new Error("Responses function call arguments must be a JSON object")
           }
           sawToolCall = true
           yield {
@@ -69,7 +91,9 @@ export function createOpenAIResponsesStream(options: OpenAIResponsesOptions): Mo
         }
       } else if (type === "response.completed") {
         const responseValue = recordProperty(event, "response")
-        previousResponseId = stringProperty(responseValue, "id")
+        if (options.conversation === "previous_response_id") {
+          previousResponseId = stringProperty(responseValue, "id")
+        }
         yield {
           type: "response.completed",
           stopReason: sawToolCall ? "tool_use" : "end_turn",
@@ -144,7 +168,7 @@ export async function* parseSseJson(body: ReadableStream<Uint8Array>): AsyncIter
           .join("\n")
         if (data !== "" && data !== "[DONE]") {
           const value: unknown = JSON.parse(data)
-          if (!isRecord(value)) throw new Error("OpenAI SSE data must be an object")
+          if (!isRecord(value)) throw new Error("Responses SSE data must be an object")
           yield value
         }
       }
@@ -162,18 +186,18 @@ function readProviderError(event: Record<string, unknown>): string {
     : response !== undefined && isRecord(response.error)
       ? response.error
       : event
-  return typeof error.message === "string" ? error.message : "OpenAI response failed"
+  return typeof error.message === "string" ? error.message : "Responses provider failed"
 }
 
 function stringProperty(value: Record<string, unknown>, key: string): string {
   const property = value[key]
-  if (typeof property !== "string") throw new Error(`OpenAI event is missing string ${key}`)
+  if (typeof property !== "string") throw new Error(`Responses event is missing string ${key}`)
   return property
 }
 
 function recordProperty(value: Record<string, unknown>, key: string): Record<string, unknown> {
   const property = value[key]
-  if (!isRecord(property)) throw new Error(`OpenAI event is missing object ${key}`)
+  if (!isRecord(property)) throw new Error(`Responses event is missing object ${key}`)
   return property
 }
 
