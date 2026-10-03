@@ -24,7 +24,20 @@ importers:
         specifier: ^7.0.2
         version: 7.0.2
 
-  apps/cli: {}
+  apps/cli:
+    dependencies:
+      '@landache/agent':
+        specifier: workspace:*
+        version: link:../../packages/agent
+      '@landache/protocol':
+        specifier: workspace:*
+        version: link:../../packages/protocol
+      '@landache/providers':
+        specifier: workspace:*
+        version: link:../../packages/providers
+      '@landache/runtime-client':
+        specifier: workspace:*
+        version: link:../../packages/runtime-client
 
   apps/web: {}
 
@@ -38,7 +51,17 @@ importers:
 
   packages/protocol: {}
 
-  packages/providers: {}
+  packages/providers:
+    dependencies:
+      '@landache/protocol':
+        specifier: workspace:*
+        version: link:../protocol
+
+  packages/runtime-client:
+    dependencies:
+      '@landache/protocol':
+        specifier: workspace:*
+        version: link:../protocol
 
   packages/ui: {}
 

@@ -5,6 +5,12 @@
     "target": "ES2022",
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
+    "paths": {
+      "@landache/agent": ["./packages/agent/src/index.ts"],
+      "@landache/protocol": ["./packages/protocol/src/index.ts"],
+      "@landache/providers": ["./packages/providers/src/index.ts"],
+      "@landache/runtime-client": ["./packages/runtime-client/src/index.ts"]
+    },
     "isolatedModules": true,
     "noUncheckedIndexedAccess": true,
     "skipLibCheck": true

@@ -1,5 +1,11 @@
 export {
+  runAgentLoop,
+  type AgentLoopOptions,
+  type AgentLoopResult,
+} from "./agent-loop.js"
+export {
   runModelTurn,
+  type ModelRequest,
   type ModelStream,
   type ModelStreamEvent,
   type ModelTurnOptions,

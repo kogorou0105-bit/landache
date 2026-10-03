@@ -8,6 +8,8 @@
 - [Minimal model turn design](architecture/model-turn.md)
 - [Tool call data contract](architecture/tool-call-contract.md)
 - [Tool registry and execution boundary](architecture/tool-execution.md)
+- [Minimal agent loop](architecture/agent-loop.md)
+- [Runtime, provider, and CLI vertical slice](architecture/runtime-provider-cli.md)
 
 ## Development
 

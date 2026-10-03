@@ -491,19 +491,20 @@ clients -> host -> agent -> protocol
 
 ## 18. 开放决策
 
+现在已有两个 V0.1 初始决定记录在
+[Runtime、Provider 与 CLI 纵向切片](runtime-provider-cli.md)中：Runtime IPC 首先采用基于 stdio
+的单请求 NDJSON，OpenAI Responses API 是首个参考 Provider。这些选择以后可以在现有接口后演进。
+
 以下问题需要继续讨论或形成独立 ADR：
 
 1. 本地 Agent Host 应当是 Node.js 进程、编译后的 JavaScript 程序，还是最终成为
    Rust 可执行程序的一部分？
 2. 客户端传输应使用 HTTP + SSE、WebSocket，还是在统一协议抽象之后提供本地 IPC？
-3. Runtime IPC 应使用基于 stdio 的 NDJSON，还是其他带帧协议？
-4. 最小且安全的内置 Tool 集合是什么？
-5. 哪些操作可以得到持久授权？
-6. Run 的准确完成条件和验证条件是什么？
-7. V0.1 以哪个 Provider 作为参考实现？
-8. 如何在不破坏调试价值的前提下对 Event Payload 脱敏？
-9. 默认保存 Provider Prompt 的哪些部分？
-10. 本地 Host 应该叫什么名字，并放在 Monorepo 的什么位置？
+3. 除 `read_file` 外，最小且安全的内置 Tool 集合是什么？
+4. 哪些操作可以得到持久授权？
+5. Run 的准确完成条件和验证条件是什么？
+6. 如何在不破坏调试价值的前提下对 Event Payload 脱敏？
+7. 默认保存 Provider Prompt 的哪些部分？
+8. 本地 Host 应该叫什么名字，并放在 Monorepo 的什么位置？
 
 这些问题被有意保留为可见状态。没有解决的问题不能被偶然的实现选择隐藏起来。
-
