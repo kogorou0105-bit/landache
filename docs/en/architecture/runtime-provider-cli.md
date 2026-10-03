@@ -8,17 +8,17 @@
 
 ## Scope
 
-This slice proves one end-to-end behavior: a user prompt reaches a real model, the model can request
-`read_file`, Rust reads a workspace file through an explicit protocol, and the model receives the
+This slice proves one end-to-end behavior: a user prompt reaches a real model, the model can discover
+and read workspace files through an explicit Rust protocol, and the model receives the
 result before the CLI prints its final response. It intentionally excludes writes, shell execution,
 persistence, sessions, and a long-lived Agent Host. It includes only a minimal CLI-local approval
 boundary for file reads, not the future general policy engine.
 
-## Runtime protocol and `read_file`
+## Runtime protocol and read-only discovery
 
 [`schemas/runtime/protocol.schema.json`](../../../schemas/runtime/protocol.schema.json) is the canonical
-v1 contract. It defines one NDJSON request/response exchange, one `read_file` method, and normalized
-errors. TypeScript constants are checked against this schema. The first Rust binary accepts the
+v1 contract. It defines one NDJSON request/response exchange, `read_file`, `list_directory`, and
+`search_text` methods, and normalized errors. TypeScript constants are checked against this schema. The Rust binary accepts the
 workspace root only as a trusted startup argument; model-controlled requests contain only a relative
 path.
 
@@ -27,6 +27,16 @@ symlink escape, accepts regular UTF-8 files only, and caps output at 1 MiB. The 
 client starts one process per request. This is deliberately inefficient but gives simple isolation and
 cancellation: aborting the call terminates the child process. A persistent multiplexed Runtime can be
 introduced after real workloads demonstrate the need.
+
+`list_directory` returns one sorted level with a 1,000-entry limit. `search_text` performs literal,
+case-sensitive, line-oriented search below one directory without following symlinks. Both discovery
+tools skip common credential and generated-dependency paths. Search additionally skips non-UTF-8 files
+and files larger than 1 MiB; it caps traversal at 10,000 files, results at 200 matches,
+and returned match text at 256 KiB. A `truncated` flag tells the model when any search limit stopped the
+operation. These deterministic limits protect both the local process and the model context.
+The CLI denial policy and Runtime discovery exclusions have different effects but share behavioral
+fixtures under `schemas/runtime/discovery-policy-fixtures.json` so their sensitive-path rules cannot
+drift silently across TypeScript and Rust.
 
 ## Provider registry and boundary
 
@@ -55,7 +65,7 @@ This is a security and privacy boundary, not merely an implementation detail.
 ## CLI
 
 The first CLI is a thin, single-prompt client. It accepts one prompt, treats the current directory as
-the workspace, registers only `read_file`, prints streamed text, and maps Ctrl-C to cancellation.
+the workspace, registers the three read-only discovery tools, prints streamed text, and maps Ctrl-C to cancellation.
 Every ordinary file read requires explicit terminal approval by default. Common credential paths such
 as `.env*`, `.git`, `.ssh`, credential filenames, and private-key extensions are denied before the
 Runtime is called. This denylist is defense in depth, not a complete secret detector.
@@ -111,6 +121,13 @@ while the sensitive-path denylist remains active.
 - Codex [`model-provider-info`](https://github.com/openai/codex/blob/main/codex-rs/model-provider-info/src/lib.rs),
   observed on `main` on 2026-10-03: adopted explicit endpoint and wire-protocol configuration. Unlike
   current Codex, Landache leaves room for non-Responses protocol adapters.
+- Codex CLI's workspace sandbox and path-scoped tool execution at commit `c542fb93`: adopted a trusted
+  runtime boundary in addition to user approval. Landache did not adopt Codex's complete sandbox and
+  executable-policy matrix for these read-only tools.
+- Aider's [`base_coder.py`](https://github.com/Aider-AI/aider/blob/main/aider/coders/base_coder.py) at
+  commit `5dc9490b`: adopted explicit exclusion as an automatic-discovery invariant, currently for a
+  fixed set of sensitive and generated paths. Landache did not adopt Aider's ignore-file machinery,
+  repo map, edit formats, or context summarization.
 
 Except for entries with an explicit release and commit above, the inspected sources are pinned by
 observation date because exact commit SHAs were not available through their web views.
@@ -121,6 +138,8 @@ TypeScript contract, agent, Runtime-client, and Provider tests cover the executa
 Focused tests cover provider failures, content filtering, chunk-split SSE, response-ID mismatch,
 Runtime cancellation, the CLI sensitive-path policy, registry validation, backward-compatible OpenAI
 configuration, and a stateless DeepSeek tool-result round trip.
+Runtime tests additionally cover stable directory listing, sensitive-path exclusion, literal search,
+search traversal rejection, and discovery output limits.
 The DeepSeek wire contract is checked against its official documentation, but the default test suite
 does not make paid calls to the live DeepSeek endpoint.
 Rust unit tests cover normal reads, traversal rejection, symlink escape, output limits, and schema

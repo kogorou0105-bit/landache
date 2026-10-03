@@ -8,15 +8,15 @@
 
 ## 范围
 
-这个切片验证一个端到端行为：用户 Prompt 到达真实模型，模型可以请求 `read_file`，Rust 通过明确
-协议读取 Workspace 文件，模型收到结果后由 CLI 输出最终回答。本阶段刻意不加入写操作、Shell、
+这个切片验证一个端到端行为：用户 Prompt 到达真实模型，模型通过明确的 Rust 协议发现并读取
+Workspace 文件，模型收到结果后由 CLI 输出最终回答。本阶段刻意不加入写操作、Shell、
 持久化、Session 和常驻 Agent Host，只加入 CLI 本地的最小文件读取审批边界，而不是未来的通用
 Policy Engine。
 
-## Runtime 协议与 `read_file`
+## Runtime 协议与只读发现
 
 [`schemas/runtime/protocol.schema.json`](../../../schemas/runtime/protocol.schema.json) 是 v1 契约的
-唯一真相，定义了一次 NDJSON 请求/响应、一个 `read_file` 方法和归一化错误。测试会校验 TypeScript
+唯一真相，定义了一次 NDJSON 请求/响应、`read_file`、`list_directory`、`search_text` 方法和归一化错误。测试会校验 TypeScript
 常量与该 Schema 一致。首个 Rust 二进制只从可信启动参数接收 Workspace Root；模型可控请求只
 包含相对路径。
 
@@ -24,6 +24,15 @@ Rust 会规范化 Workspace 和目标路径，拒绝绝对路径、父目录穿�
 UTF-8 文件，并把输出限制为 1 MiB。TypeScript Runtime Client 每次请求启动一个进程。这个方案
 效率不高，但隔离和取消语义简单：调用取消时终止子进程。真实负载证明有需要后，再引入常驻、
 多路复用的 Runtime。
+
+`list_directory` 返回排序后的单层目录内容，上限为 1,000 个 Entry。`search_text` 在一个目录下进行
+区分大小写的按行字面量搜索，不跟随 Symlink。两个发现工具都会跳过常见凭据与生成依赖路径；搜索还会
+跳过非 UTF-8 文件和超过 1 MiB 的文件，并把遍历
+限制为 10,000 个文件、结果限制为 200 个 Match、返回文本限制为 256 KiB。任何限制导致提前停止时，
+结果中的 `truncated` 会显式通知模型。这些确定性上限同时保护本地进程和模型上下文。
+CLI 拒绝策略与 Runtime 发现排除的效果不同，但共同使用
+`schemas/runtime/discovery-policy-fixtures.json` 中的行为 Fixture，防止 TypeScript 与 Rust 的敏感路径
+规则静默漂移。
 
 ## Provider Registry 与边界
 
@@ -47,8 +56,8 @@ Tool Result 会发送给配置的模型 Provider。OpenAI 配置设置 `store: t
 
 ## CLI
 
-首个 CLI 是很薄的单 Prompt 客户端：接收一个 Prompt，把当前目录作为 Workspace，只注册
-`read_file`，输出流式文本，并把 Ctrl-C 映射为取消。
+首个 CLI 是很薄的单 Prompt 客户端：接收一个 Prompt，把当前目录作为 Workspace，注册三个只读
+发现工具，输出流式文本，并把 Ctrl-C 映射为取消。
 默认情况下，每次普通文件读取都需要终端明确审批。`.env*`、`.git`、`.ssh`、常见凭据文件名和
 私钥扩展名等路径会在调用 Runtime 前被拒绝。这个拒绝列表是纵深防御，不是完整的秘密检测器。
 
@@ -98,6 +107,12 @@ MODEL_PROVIDER=deepseek MODEL_NAME=deepseek-flash DEEPSEEK_API_KEY=... \
 - Codex 的 [`model-provider-info`](https://github.com/openai/codex/blob/main/codex-rs/model-provider-info/src/lib.rs)，
   于 2026-10-03 查看 `main`：采用显式 Endpoint 和 Wire Protocol 配置。与当前 Codex 不同，
   Landache 为非 Responses 协议 Adapter 保留扩展位置。
+- Codex CLI 在 Commit `c542fb93` 的 Workspace Sandbox 与路径限定 Tool Execution：采用在用户审批
+  之外仍保留可信 Runtime 边界；没有为这些只读工具采用 Codex 完整的 Sandbox 与可执行文件策略矩阵。
+- Aider 在 Commit `5dc9490b` 的
+  [`base_coder.py`](https://github.com/Aider-AI/aider/blob/main/aider/coders/base_coder.py)：采用在自动发现时
+  把显式排除作为自动发现的不变量，当前使用固定的敏感与生成路径集合；没有采用 Aider 的 Ignore
+  文件机制、Repo Map、Edit Format 和上下文摘要。
 
 除上文已经明确记录 Release 与 Commit 的条目外，其余来源因无法通过查看的 Web 页面得到准确
 Commit SHA，按查看日期固定。
@@ -107,6 +122,7 @@ Commit SHA，按查看日期固定。
 TypeScript 契约、Agent、Runtime Client 和 Provider 测试覆盖了可执行的 TypeScript 部分。聚焦
 测试还覆盖 Provider 失败、内容过滤、跨 Chunk SSE、响应 ID 不匹配、Runtime 取消和 CLI 敏感
 路径策略，以及 Registry 校验、兼容旧配置的 OpenAI 解析和无状态 DeepSeek Tool Result 往返。
+Runtime 测试还覆盖稳定目录列表、敏感路径排除、字面量搜索、搜索路径穿越拒绝和发现结果上限。
 DeepSeek Wire Contract 已对照其官方文档核验，但默认测试套件不会向 DeepSeek 线上 Endpoint
 发起付费调用。
 Rust 单元测试覆盖正常读取、路径穿越、Symlink Escape、输出上限和 Schema 错误码一致性。

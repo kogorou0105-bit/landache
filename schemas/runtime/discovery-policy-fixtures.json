@@ -1,0 +1,38 @@
+{
+  "sensitivePaths": [
+    ".env",
+    ".env.local",
+    ".envrc",
+    ".git/config",
+    "vendor/dependency/.git/config",
+    ".ssh/id_rsa",
+    ".aws/credentials",
+    ".azure/credentials",
+    ".gnupg/private-keys-v1.d/key",
+    ".netrc",
+    ".npmrc",
+    ".pypirc",
+    "config/credentials",
+    "keys/id_dsa",
+    "keys/id_ecdsa",
+    "keys/id_ed25519",
+    "keys/id_rsa",
+    "certs/server.pem",
+    "certs/server.key",
+    "certs/server.p12",
+    "certs/server.pfx"
+  ],
+  "ordinaryPaths": [
+    "README.md",
+    "src/index.ts",
+    "docs/environment.md",
+    "keys/README.md"
+  ],
+  "generatedPaths": [
+    "node_modules/package/index.js",
+    ".pnpm-store/index.json",
+    "coverage/report.json",
+    "dist/index.js",
+    "target/debug/binary"
+  ]
+}

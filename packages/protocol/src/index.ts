@@ -23,9 +23,19 @@ export type {
 } from "./tool.js"
 export {
   RUNTIME_PROTOCOL_VERSION,
+  RUNTIME_METHODS,
   RUNTIME_ERROR_CODES,
+  type DirectoryEntry,
+  type ListDirectoryRuntimeRequest,
+  type ListDirectoryRuntimeResult,
   type ReadFileRuntimeRequest,
   type ReadFileRuntimeResult,
+  type RuntimeRequest,
+  type RuntimeMethod,
   type RuntimeErrorCode,
+  type RuntimeResult,
   type RuntimeResponse,
+  type SearchTextMatch,
+  type SearchTextRuntimeRequest,
+  type SearchTextRuntimeResult,
 } from "./runtime.js"

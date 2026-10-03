@@ -14,6 +14,42 @@ test("parses successful and failed runtime responses", () => {
     id: "r2",
     error: { code: "not_found", message: "missing" },
   })
+  assert.deepEqual(parseRuntimeResponse(
+    '{"version":1,"id":"r3","result":{"entries":[{"path":"src","type":"directory"}]}}',
+  ), {
+    version: 1,
+    id: "r3",
+    result: { entries: [{ path: "src", type: "directory" }] },
+  })
+  assert.deepEqual(parseRuntimeResponse(
+    '{"version":1,"id":"r4","result":{"matches":[{"path":"src/a.ts","line":2,"column":3,"preview":"  hit"}],"truncated":false}}',
+  ), {
+    version: 1,
+    id: "r4",
+    result: {
+      matches: [{ path: "src/a.ts", line: 2, column: 3, preview: "  hit" }],
+      truncated: false,
+    },
+  })
+})
+
+test("invokes directory listing and text search methods", async () => {
+  const runtime = new RuntimeClient({
+    workspaceRoot: process.cwd(),
+    executable: process.execPath,
+    executableArgs: [
+      "-e",
+      "let data=''; process.stdin.on('data', c => data += c); process.stdin.on('end', () => { const r=JSON.parse(data); const result=r.method==='list_directory' ? {entries:[{path:r.params.path,type:'directory'}]} : {matches:[{path:r.params.path,line:1,column:1,preview:r.params.query}],truncated:false}; console.log(JSON.stringify({version:1,id:r.id,result})); });",
+      "--",
+    ],
+    createRequestId: () => "request-1",
+  })
+
+  assert.deepEqual(await runtime.listDirectory("src"), [{ path: "src", type: "directory" }])
+  assert.deepEqual(await runtime.searchText("src", "needle"), {
+    matches: [{ path: "src", line: 1, column: 1, preview: "needle" }],
+    truncated: false,
+  })
 })
 
 test("rejects malformed runtime responses", () => {
