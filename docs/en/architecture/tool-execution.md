@@ -136,8 +136,8 @@ Cancellation rethrows the original reason and does not invent a tool result. If 
 itself unavailable, failure-terminal publication remains best effort; reliable persistence ultimately
 requires a transactional event store.
 
-## 7. Foundation for the next step
+## 7. Agent-loop integration
 
-The next stage can implement a minimal `runAgentLoop`: call `runModelTurn`, extract tool calls, execute
-them sequentially through the registry, append tool-result messages, and start another model turn until
-`end_turn` or an explicit limit is reached.
+The [minimal agent loop](agent-loop.md) now calls `runModelTurn`, extracts tool calls, executes them
+sequentially through the registry, appends tool-result messages, and starts another model turn until a
+non-tool stop reason or an explicit limit is reached.

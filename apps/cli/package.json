@@ -2,6 +2,17 @@
   "name": "@landache/cli",
   "private": true,
   "version": "0.0.0",
-  "type": "module"
+  "type": "module",
+  "bin": { "landache": "./dist/index.js" },
+  "scripts": {
+    "build": "tsc -b tsconfig.build.json",
+    "test": "node --test test/**/*.test.ts",
+    "typecheck": "tsc -b tsconfig.build.json --pretty false && tsc -p tsconfig.test.json --pretty false"
+  },
+  "dependencies": {
+    "@landache/agent": "workspace:*",
+    "@landache/protocol": "workspace:*",
+    "@landache/providers": "workspace:*",
+    "@landache/runtime-client": "workspace:*"
+  }
 }
-

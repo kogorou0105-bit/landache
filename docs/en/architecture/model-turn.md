@@ -100,13 +100,20 @@ classDiagram
         +string assistantMessageId
         +number turn
         +ModelStream streamModel
+        +readonly ToolDescriptor[] tools
         +AbortSignal signal
         +EventSink emit
     }
 
     class ModelStream {
         <<function>>
-        +call(messages, signal) AsyncIterable~ModelStreamEvent~
+        +call(ModelRequest) AsyncIterable~ModelStreamEvent~
+    }
+
+    class ModelRequest {
+        +readonly AgentMessage[] messages
+        +readonly ToolDescriptor[] tools
+        +AbortSignal signal
     }
 
     class ModelStreamEvent {
@@ -153,6 +160,8 @@ classDiagram
     runModelTurn --> ModelTurnResult : returns
     ModelTurnOptions o-- AgentMessage : history
     ModelTurnOptions --> ModelStream : invokes
+    ModelStream --> ModelRequest : receives
+    ModelRequest o-- AgentMessage : history
     ModelStream --> ModelStreamEvent : produces
     ModelStreamEvent --> TextDelta : variant
     ModelStreamEvent --> ToolCallCompleted : variant
@@ -191,6 +200,10 @@ declare that the entire agent run has started or finished; those events belong t
 loop.
 
 ## 5. Explicit model-stream handling
+
+The provider-neutral `ModelStream` receives one `ModelRequest`: conversation messages, the tool
+descriptors exposed for this turn, and the optional cancellation signal. `runModelTurn` defaults the
+tool list to empty and does not expose execution functions to the provider.
 
 Model stream events form a discriminated union and are handled individually with a `switch`:
 
@@ -268,12 +281,12 @@ demonstrated requirements. Copying them early would hide architectural decisions
 
 The stable seams established by this change support:
 
-1. implementing an outer `runAgentLoop` that alternates model turns and tool execution;
+1. extending the implemented [minimal `runAgentLoop`](agent-loop.md) with run-level capabilities;
 2. connecting events to persistence and CLI/Web projections;
 3. mapping different model SDKs into `ModelStreamEvent` in provider adapters;
 4. adding sequence, run ID, timestamps, and schema versions after the event schema stabilizes.
 
-The tool registry and tool result are now implemented. The most useful next increment is **a minimal
-`runAgentLoop`**, not UI, database integration, or a
-complex provider. It will validate the real closed loop: model proposal → validation and execution →
-recorded result → another model turn → explicit completion.
+The tool registry, tool result, and [minimal `runAgentLoop`](agent-loop.md) are now implemented. They
+validate the real closed loop: model proposal → validation and execution → recorded result → another
+model turn → explicit completion. The next increments can build persistence, policy, and provider
+integration on that boundary.

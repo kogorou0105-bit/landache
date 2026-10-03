@@ -130,7 +130,7 @@ Policy、Approval 和 Rust Runtime 边界。
 取消会重新抛出原始原因，不会伪造 Tool Result。事件消费者失败时，失败终态仍然只能 best-effort
 发布；可靠持久化最终需要事务性 Event Store。
 
-## 7. 为下一步铺垫
+## 7. 接入 Agent Loop
 
-下一阶段可以实现最小 `runAgentLoop`：调用 `runModelTurn`，提取 Tool Call，通过 Registry 顺序执行，
-把 Tool Result Message 追加到历史，再开始下一模型回合，直到收到 `end_turn` 或达到明确上限。
+[最小 Agent Loop](agent-loop.md) 现已调用 `runModelTurn`、提取 Tool Call、通过 Registry 顺序执行、
+把 Tool Result Message 追加到历史，并开始下一模型回合，直到收到非工具停止原因或达到明确上限。

@@ -8,6 +8,8 @@
 - [最小模型回合设计](architecture/model-turn.md)
 - [Tool Call 数据契约](architecture/tool-call-contract.md)
 - [Tool Registry 与执行边界](architecture/tool-execution.md)
+- [最小 Agent Loop](architecture/agent-loop.md)
+- [Runtime、Provider 与 CLI 纵向切片](architecture/runtime-provider-cli.md)
 
 ## 开发
 

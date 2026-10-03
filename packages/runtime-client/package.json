@@ -1,5 +1,5 @@
 {
-  "name": "@landache/providers",
+  "name": "@landache/runtime-client",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -14,7 +14,5 @@
     "test": "node --test test/**/*.test.ts",
     "typecheck": "tsc -b tsconfig.build.json --pretty false && tsc -p tsconfig.test.json --pretty false"
   },
-  "dependencies": {
-    "@landache/protocol": "workspace:*"
-  }
+  "dependencies": { "@landache/protocol": "workspace:*" }
 }

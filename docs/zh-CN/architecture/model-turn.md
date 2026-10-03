@@ -94,13 +94,20 @@ classDiagram
         +string assistantMessageId
         +number turn
         +ModelStream streamModel
+        +readonly ToolDescriptor[] tools
         +AbortSignal signal
         +EventSink emit
     }
 
     class ModelStream {
         <<function>>
-        +call(messages, signal) AsyncIterable~ModelStreamEvent~
+        +call(ModelRequest) AsyncIterable~ModelStreamEvent~
+    }
+
+    class ModelRequest {
+        +readonly AgentMessage[] messages
+        +readonly ToolDescriptor[] tools
+        +AbortSignal signal
     }
 
     class ModelStreamEvent {
@@ -147,6 +154,8 @@ classDiagram
     runModelTurn --> ModelTurnResult : 返回
     ModelTurnOptions o-- AgentMessage : 历史消息
     ModelTurnOptions --> ModelStream : 调用
+    ModelStream --> ModelRequest : 接收
+    ModelRequest o-- AgentMessage : 历史消息
     ModelStream --> ModelStreamEvent : 产生
     ModelStreamEvent --> TextDelta : 变体
     ModelStreamEvent --> ToolCallCompleted : 变体
@@ -184,6 +193,10 @@ classDiagram
 或完成，这两个事件应由未来真正的 Agent Loop 发出。
 
 ## 5. 明确处理模型流事件
+
+Provider 中立的 `ModelStream` 接收一个 `ModelRequest`：对话消息、本回合暴露给模型的 Tool
+Descriptor，以及可选的取消信号。`runModelTurn` 默认使用空工具列表，也不会把工具执行函数暴露给
+Provider。
 
 模型流事件采用可辨识联合类型，并通过 `switch` 逐个处理：
 
@@ -257,10 +270,11 @@ follow-up queue、并行或顺序工具执行、动态工具集、上下文转�
 
 这次提交建立的稳定接缝将支持：
 
-1. 实现外层 `runAgentLoop`，在模型回合与工具执行之间循环；
+1. 在已实现的[最小 `runAgentLoop`](agent-loop.md) 上增加 Run 级能力；
 2. 将事件接入持久化存储和 CLI/Web Projection；
 3. 在 Provider Adapter 中把不同模型 SDK 映射为统一的 `ModelStreamEvent`；
 4. 在 Event Schema 稳定后加入 sequence、run ID、时间戳和版本信息。
 
-Tool Registry 与 Tool Result 已经实现。下一步最适合增加的是**最小 `runAgentLoop`**，而不是立即加入 UI、数据库或复杂 Provider。
-它可以验证真正的闭环：模型提出调用 → 校验并执行工具 → 记录结果 → 再调用模型 → 明确结束。
+Tool Registry、Tool Result 和[最小 `runAgentLoop`](agent-loop.md) 已经实现，共同验证了真正的闭环：
+模型提出调用 → 校验并执行工具 → 记录结果 → 再调用模型 → 明确结束。后续可以在这个边界上增加
+持久化、策略和 Provider 集成。

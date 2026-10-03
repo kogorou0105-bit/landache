@@ -3,6 +3,9 @@
   "files": [],
   "references": [
     { "path": "./packages/protocol/tsconfig.build.json" },
-    { "path": "./packages/agent/tsconfig.build.json" }
+    { "path": "./packages/agent/tsconfig.build.json" },
+    { "path": "./packages/runtime-client/tsconfig.build.json" },
+    { "path": "./packages/providers/tsconfig.build.json" },
+    { "path": "./apps/cli/tsconfig.build.json" }
   ]
 }

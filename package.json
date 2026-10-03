@@ -8,7 +8,7 @@
     "commitlint": "commitlint",
     "dev": "pnpm --parallel -r dev",
     "prepare": "lefthook install",
-    "test": "pnpm build && pnpm --filter @landache/agent test",
+    "test": "pnpm build && pnpm --filter @landache/protocol test && pnpm --filter @landache/agent test && pnpm --filter @landache/runtime-client test && pnpm --filter @landache/providers test && pnpm --filter @landache/cli test",
     "typecheck": "pnpm -r typecheck"
   },
   "devDependencies": {

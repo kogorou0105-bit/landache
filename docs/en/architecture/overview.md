@@ -519,20 +519,23 @@ observability principles rather than bypassing them.
 
 ## 18. Open decisions
 
+Two initial V0.1 decisions are now recorded in the
+[Runtime, provider, and CLI vertical slice](runtime-provider-cli.md): Runtime IPC starts as one-request
+NDJSON over stdio, and the OpenAI Responses API is the first reference provider. These choices can
+evolve behind their existing interfaces.
+
 The following questions require separate discussion or ADRs:
 
 1. Should the local Agent Host be a Node.js process, a compiled JavaScript
    binary, or eventually part of the Rust executable?
 2. Should client transport use HTTP plus SSE, WebSocket, or a local IPC adapter
    behind one protocol abstraction?
-3. Should Runtime IPC use NDJSON over stdio or another framed protocol?
-4. What is the smallest safe built-in tool set?
-5. Which operations may receive persistent approval?
-6. What are the exact run completion and verification criteria?
-7. Which provider is the reference implementation for V0.1?
-8. How are event payloads redacted without destroying debugging value?
-9. Which portions of provider prompts are retained by default?
-10. What should the local host application be named and where should it live in
+3. What is the smallest safe built-in tool set beyond `read_file`?
+4. Which operations may receive persistent approval?
+5. What are the exact run completion and verification criteria?
+6. How are event payloads redacted without destroying debugging value?
+7. Which portions of provider prompts are retained by default?
+8. What should the local host application be named and where should it live in
     the monorepo?
 
 These are intentionally visible. An unresolved question should not be hidden by

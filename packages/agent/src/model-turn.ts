@@ -4,28 +4,22 @@ import type {
   AssistantContent,
   AssistantMessage,
   AssistantStopReason,
-  ToolCall,
+  ModelStopReason,
+  ModelStream,
+  ModelStreamEvent,
+  ToolDescriptor,
 } from "@landache/protocol"
 
 import { describeError, emitBestEffort } from "./internal/failure.js"
 
-export type ModelStopReason = "end_turn" | "tool_use" | "max_tokens" | "content_filter"
-
-export type ModelStreamEvent =
-  | { type: "text.delta"; delta: string }
-  | { type: "tool_call.completed"; toolCall: ToolCall }
-  | { type: "response.completed"; stopReason: ModelStopReason }
-
-export type ModelStream = (
-  messages: readonly AgentMessage[],
-  signal?: AbortSignal,
-) => AsyncIterable<ModelStreamEvent>
+export type { ModelRequest, ModelStopReason, ModelStream, ModelStreamEvent } from "@landache/protocol"
 
 export type ModelTurnOptions = {
   messages: readonly AgentMessage[]
   assistantMessageId: string
   turn: number
   streamModel: ModelStream
+  tools?: readonly ToolDescriptor[]
   signal?: AbortSignal
   emit?: (event: AgentEvent) => void | Promise<void>
 }
@@ -65,7 +59,11 @@ export async function runModelTurn(options: ModelTurnOptions): Promise<ModelTurn
     })
     messageStarted = true
 
-    for await (const event of options.streamModel(options.messages, options.signal)) {
+    for await (const event of options.streamModel({
+      messages: options.messages,
+      tools: options.tools ?? [],
+      signal: options.signal,
+    })) {
       options.signal?.throwIfAborted()
 
       switch (event.type) {

@@ -24,9 +24,6 @@ Before creating a commit, explain to the maintainer in plain language:
 Show the relevant diff or a clear file-by-file summary. Do not create the commit until the
 maintainer explicitly approves it.
 
-For a meaningful code or architecture change, apply the project skill at
-`.agents/skills/change-quality-review/SKILL.md` before requesting approval to commit.
-
 ## Documentation
 
 For a meaningful feature, fix, refactor, or architectural change, add or update documentation that
