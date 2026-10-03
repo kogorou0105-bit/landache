@@ -493,7 +493,8 @@ clients -> host -> agent -> protocol
 
 现在已有两个 V0.1 初始决定记录在
 [Runtime、Provider 与 CLI 纵向切片](runtime-provider-cli.md)中：Runtime IPC 首先采用基于 stdio
-的单请求 NDJSON，OpenAI Responses API 是首个参考 Provider。这些选择以后可以在现有接口后演进。
+的单请求 NDJSON，OpenAI 与 DeepSeek 是首批由 Registry 驱动的 Responses Provider。这些选择以后
+可以在现有接口后演进。
 
 以下问题需要继续讨论或形成独立 ADR：
 

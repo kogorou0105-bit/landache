@@ -5,7 +5,7 @@ import { resolve } from "node:path"
 
 import { createToolRegistry, runAgentLoop, type ToolDefinition } from "@landache/agent"
 import type { AgentEvent } from "@landache/protocol"
-import { createOpenAIResponsesStream } from "@landache/providers"
+import { createProviderModelStream, resolveProviderConfig } from "@landache/providers"
 import { RuntimeClient } from "@landache/runtime-client"
 
 import { approveReadFile } from "./read-file-policy.js"
@@ -23,8 +23,7 @@ async function main(prompt: string): Promise<void> {
   process.once("SIGINT", () => controller.abort(new Error("Cancelled by user")))
 
   try {
-    const apiKey = requireEnvironment("OPENAI_API_KEY")
-    const model = requireEnvironment("OPENAI_MODEL")
+    const provider = resolveProviderConfig(process.env)
     const runtime = new RuntimeClient({
       workspaceRoot: process.cwd(),
       executable: process.env.LANDACHE_RUNTIME_BIN ?? resolve("target/debug/landache-runtime"),
@@ -52,7 +51,7 @@ async function main(prompt: string): Promise<void> {
     const result = await runAgentLoop({
       messages: [{ id: randomUUID(), role: "user", content: prompt }],
       registry: createToolRegistry([readFile]),
-      streamModel: createOpenAIResponsesStream({ apiKey, model }),
+      streamModel: createProviderModelStream(provider),
       maxTurns: 8,
       createMessageId: randomUUID,
       signal: controller.signal,
@@ -77,12 +76,4 @@ function printEvent(event: AgentEvent): void {
   } else if (event.type === "tool.call.completed" && event.result.content.type === "error") {
     console.error(`[tool error] ${event.result.content.message}`)
   }
-}
-
-function requireEnvironment(name: string): string {
-  const value = process.env[name]
-  if (value === undefined || value === "") {
-    throw new Error(`${name} is required`)
-  }
-  return value
 }

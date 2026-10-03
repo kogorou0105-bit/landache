@@ -521,7 +521,7 @@ observability principles rather than bypassing them.
 
 Two initial V0.1 decisions are now recorded in the
 [Runtime, provider, and CLI vertical slice](runtime-provider-cli.md): Runtime IPC starts as one-request
-NDJSON over stdio, and the OpenAI Responses API is the first reference provider. These choices can
+NDJSON over stdio, and OpenAI plus DeepSeek are the first registry-backed Responses providers. These choices can
 evolve behind their existing interfaces.
 
 The following questions require separate discussion or ADRs:
