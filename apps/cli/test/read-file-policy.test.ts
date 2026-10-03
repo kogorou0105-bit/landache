@@ -1,20 +1,22 @@
 import assert from "node:assert/strict"
+import { readFile } from "node:fs/promises"
 import test from "node:test"
 
 import { approveReadFile, isSensitiveReadPath } from "../dist/read-file-policy.js"
 
-test("denies common credential paths", () => {
-  for (const path of [
-    ".env",
-    ".env.local",
-    ".envrc",
-    ".git/config",
-    "vendor/dependency/.git/config",
-    ".ssh/id_rsa",
-    "config/credentials",
-    "certs/server.pem",
-    "certs/server.key",
-  ]) {
+type DiscoveryPolicyFixtures = {
+  sensitivePaths: string[]
+  ordinaryPaths: string[]
+}
+
+async function readPolicyFixtures(): Promise<DiscoveryPolicyFixtures> {
+  const path = new URL("../../../schemas/runtime/discovery-policy-fixtures.json", import.meta.url)
+  return JSON.parse(await readFile(path, "utf8")) as DiscoveryPolicyFixtures
+}
+
+test("denies every shared sensitive-path fixture", async () => {
+  const fixtures = await readPolicyFixtures()
+  for (const path of fixtures.sensitivePaths) {
     assert.equal(isSensitiveReadPath(path), true, path)
   }
 })
@@ -31,8 +33,9 @@ test("explicit non-interactive approval never bypasses sensitive paths", async (
   }
 })
 
-test("allows ordinary source and documentation paths", () => {
-  for (const path of ["README.md", "src/index.ts", "docs/environment.md", "keys/README.md"]) {
+test("allows every shared ordinary-path fixture", async () => {
+  const fixtures = await readPolicyFixtures()
+  for (const path of fixtures.ordinaryPaths) {
     assert.equal(isSensitiveReadPath(path), false, path)
   }
 })

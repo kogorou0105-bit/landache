@@ -1,5 +1,6 @@
 import { createInterface } from "node:readline/promises"
 
+// Keep behavior aligned with schemas/runtime/discovery-policy-fixtures.json and the Rust Runtime tests.
 const SENSITIVE_COMPONENTS = new Set([".aws", ".azure", ".git", ".gnupg", ".ssh"])
 const SENSITIVE_NAMES = new Set([
   ".netrc",
@@ -26,23 +27,27 @@ export function isSensitiveReadPath(path: string): boolean {
 }
 
 export async function approveReadFile(path: string): Promise<void> {
+  await approveReadOperation("read_file", path)
+}
+
+export async function approveReadOperation(toolName: string, path: string): Promise<void> {
   if (isSensitiveReadPath(path)) {
-    throw new Error(`read_file denied for sensitive path: ${path}`)
+    throw new Error(`${toolName} denied for sensitive path: ${path}`)
   }
   if (process.env.LANDACHE_APPROVE_READ_FILE === "1") return
   if (process.stdin.isTTY !== true || process.stderr.isTTY !== true) {
     throw new Error(
-      "read_file requires interactive approval; set LANDACHE_APPROVE_READ_FILE=1 to approve non-sensitive reads for this run",
+      `${toolName} requires interactive approval; set LANDACHE_APPROVE_READ_FILE=1 to approve non-sensitive reads for this run`,
     )
   }
 
   const prompt = createInterface({ input: process.stdin, output: process.stderr })
   try {
     const answer = await prompt.question(
-      `[approval] Allow read_file ${JSON.stringify(path)}? Its content will be sent to and may be stored by the model provider. [y/N] `,
+      `[approval] Allow ${toolName} ${JSON.stringify(path)}? Its result will be sent to and may be stored by the model provider. [y/N] `,
     )
     if (!/^(?:y|yes)$/i.test(answer.trim())) {
-      throw new Error(`read_file was not approved: ${path}`)
+      throw new Error(`${toolName} was not approved: ${path}`)
     }
   } finally {
     prompt.close()

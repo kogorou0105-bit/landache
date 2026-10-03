@@ -11,13 +11,37 @@
       "properties": {
         "version": { "const": 1 },
         "id": { "type": "string", "minLength": 1 },
-        "method": { "const": "read_file" },
-        "params": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["path"],
-          "properties": { "path": { "type": "string", "minLength": 1 } }
+        "method": { "enum": ["read_file", "list_directory", "search_text"] },
+        "params": { "type": "object" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "method": { "const": "read_file" } } },
+          "then": { "properties": { "params": { "$ref": "#/$defs/pathParams" } } }
+        },
+        {
+          "if": { "properties": { "method": { "const": "list_directory" } } },
+          "then": { "properties": { "params": { "$ref": "#/$defs/pathParams" } } }
+        },
+        {
+          "if": { "properties": { "method": { "const": "search_text" } } },
+          "then": { "properties": { "params": { "$ref": "#/$defs/searchTextParams" } } }
         }
+      ]
+    },
+    "pathParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path"],
+      "properties": { "path": { "type": "string", "minLength": 1 } }
+    },
+    "searchTextParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "query"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "query": { "type": "string", "minLength": 1 }
       }
     },
     "response": {
@@ -28,17 +52,18 @@
         "version": { "const": 1 },
         "id": { "type": "string", "minLength": 1 },
         "result": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["content"],
-          "properties": { "content": { "type": "string" } }
+          "oneOf": [
+            { "$ref": "#/$defs/readFileResult" },
+            { "$ref": "#/$defs/listDirectoryResult" },
+            { "$ref": "#/$defs/searchTextResult" }
+          ]
         },
         "error": {
           "type": "object",
           "additionalProperties": false,
           "required": ["code", "message"],
           "properties": {
-            "code": { "enum": ["invalid_request", "path_outside_workspace", "not_found", "not_a_file", "permission_denied", "output_limit_exceeded", "invalid_utf8", "internal_error"] },
+            "code": { "enum": ["invalid_request", "path_outside_workspace", "not_found", "not_a_file", "not_a_directory", "permission_denied", "output_limit_exceeded", "invalid_utf8", "internal_error"] },
             "message": { "type": "string" }
           }
         }
@@ -47,6 +72,53 @@
         { "required": ["result"], "not": { "required": ["error"] } },
         { "required": ["error"], "not": { "required": ["result"] } }
       ]
+    },
+    "readFileResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["content"],
+      "properties": { "content": { "type": "string" } }
+    },
+    "listDirectoryResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["entries"],
+      "properties": {
+        "entries": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["path", "type"],
+            "properties": {
+              "path": { "type": "string" },
+              "type": { "enum": ["file", "directory", "symlink"] }
+            }
+          }
+        }
+      }
+    },
+    "searchTextResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["matches", "truncated"],
+      "properties": {
+        "matches": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["path", "line", "column", "preview"],
+            "properties": {
+              "path": { "type": "string" },
+              "line": { "type": "integer", "minimum": 1 },
+              "column": { "type": "integer", "minimum": 1 },
+              "preview": { "type": "string" }
+            }
+          }
+        },
+        "truncated": { "type": "boolean" }
+      }
     }
   }
 }

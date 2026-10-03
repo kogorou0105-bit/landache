@@ -8,7 +8,7 @@ import type { AgentEvent } from "@landache/protocol"
 import { createProviderModelStream, resolveProviderConfig } from "@landache/providers"
 import { RuntimeClient } from "@landache/runtime-client"
 
-import { approveReadFile } from "./read-file-policy.js"
+import { approveReadOperation } from "./read-file-policy.js"
 
 const prompt = process.argv.slice(2).join(" ").trim()
 if (prompt === "") {
@@ -43,14 +43,57 @@ async function main(prompt: string): Promise<void> {
           : { ok: false, error: "path must be a non-empty string" },
       execute: async (input, signal) => {
         const path = String(input.path)
-        await approveReadFile(path)
+        await approveReadOperation("read_file", path)
         return { content: await runtime.readFile(path, signal) }
+      },
+    }
+    const listDirectory: ToolDefinition = {
+      name: "list_directory",
+      description: "List one directory using a path relative to the current workspace. This does not recurse.",
+      inputSchema: {
+        type: "object",
+        properties: { path: { type: "string" } },
+        required: ["path"],
+        additionalProperties: false,
+      },
+      validate: (input) =>
+        typeof input.path === "string" && input.path.length > 0
+          ? { ok: true, value: input }
+          : { ok: false, error: "path must be a non-empty string" },
+      execute: async (input, signal) => {
+        const path = String(input.path)
+        await approveReadOperation("list_directory", path)
+        return { entries: await runtime.listDirectory(path, signal) }
+      },
+    }
+    const searchText: ToolDefinition = {
+      name: "search_text",
+      description: "Recursively find literal text in UTF-8 files below a workspace-relative directory.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          path: { type: "string" },
+          query: { type: "string" },
+        },
+        required: ["path", "query"],
+        additionalProperties: false,
+      },
+      validate: (input) =>
+        typeof input.path === "string" && input.path.length > 0
+          && typeof input.query === "string" && input.query.length > 0
+          ? { ok: true, value: input }
+          : { ok: false, error: "path and query must be non-empty strings" },
+      execute: async (input, signal) => {
+        const path = String(input.path)
+        const query = String(input.query)
+        await approveReadOperation("search_text", path)
+        return await runtime.searchText(path, query, signal)
       },
     }
 
     const result = await runAgentLoop({
       messages: [{ id: randomUUID(), role: "user", content: prompt }],
-      registry: createToolRegistry([readFile]),
+      registry: createToolRegistry([readFile, listDirectory, searchText]),
       streamModel: createProviderModelStream(provider),
       maxTurns: 8,
       createMessageId: randomUUID,
